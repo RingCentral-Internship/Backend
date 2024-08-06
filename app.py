@@ -1,10 +1,13 @@
 import json
 import pandas as pd  # show data in a dataframe (original form: list)
 from simple_salesforce import Salesforce, SalesforceLogin, SFType
+from flask import Flask, request, jsonify
 
+# configure Flask application
+app = Flask(__name__)
 
 # configure login information
-loginInfo = json.load(open('login.json'))
+loginInfo = json.load(open('virtual_env/login.json'))
 username = loginInfo['username']
 password = loginInfo['password']
 security_token = loginInfo['security_token']
@@ -26,15 +29,24 @@ print(metadata_org['maxBatchSize'])  # max number of records
 df_sobjects = pd.DataFrame(metadata_org['sobjects'])  # create data frame for sobjects
 df_sobjects.to_csv('org metadata info.csv', index=False)  # convert to csv file to make viewable
 
-# get fields for a specific object: provide API NAME (goto object manager)
-project = SFType('__name__', session_id, instance)  # creating project instance
-project_metadata = project.describe()  # accessing data
-df_project_metadata = pd.DataFrame(project_metadata.get('fields'))  # getting fields
+# # get fields for a specific object: provide API NAME (goto object manager)
+# project = SFType('__name__', session_id, instance)  # creating project instance
+# project_metadata = project.describe()  # accessing data
+# df_project_metadata = pd.DataFrame(project_metadata.get('fields'))  # getting fields
 
 # query SOQL
-# to test query:
-# 1. developer console
-# 2. query editor, write query and see records
-querySOQL = """ADD SOQL query"""
-testing = sf.query(querySOQL)
-print(testing)  # will print as a dictionary
+@app.route('/query_lead', methods=['POST'])
+def query_lead():
+    """query lead using lead ID"""
+    leadID = request.json.get('lead_id')  # lead ID from js message request 
+    if leadID:  # lead ID has been recieved 
+        fields = "Id, Name, Company, Email, Phone, Status"
+        obj = "Lead"
+        condition = f"Id = '{leadID}'"
+        querySOQL = f"SELECT {fields} FROM {obj} WHERE {condition}"
+        result = sf.query(querySOQL)
+        return jsonify(result['records'][0] if result['records'] else {})
+    return jsonify({'error': 'Lead ID not provided'}), 400
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
