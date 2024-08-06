@@ -34,12 +34,13 @@ sf = Salesforce(instance=instance, session_id=session_id)
 # project_metadata = project.describe()  # accessing data
 # df_project_metadata = pd.DataFrame(project_metadata.get('fields'))  # getting fields
 
+
 # query SOQL
 @app.route('/query_lead', methods=['POST'])
 def query_lead():
     """query lead using lead ID"""
-    leadID = request.json.get('lead_id')  # lead ID from js message request
-    if leadID:  # lead ID has been recieved
+    leadID = request.json.get('lead_id')  # lead ID from js message request 
+    if leadID:  # lead ID has been recieved 
         fields = "Id, Name, Company, Email, Phone, Status"
         obj = "Lead"
         condition = f"Id = '{leadID}'"
@@ -47,6 +48,7 @@ def query_lead():
         result = sf.query(querySOQL)
         return jsonify(result['records'][0] if result['records'] else {})
     return jsonify({'error': 'Lead ID not provided'}), 400
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
