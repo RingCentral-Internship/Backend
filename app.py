@@ -17,17 +17,17 @@ domain = 'login'
 session_id, instance = SalesforceLogin(username=username, password=password, security_token=security_token, domain=domain)
 sf = Salesforce(instance=instance, session_id=session_id)
 
-# get Salesforce org information (for personal confirmation that we've securely connected)
-for element in dir(sf):
-    if not element.startswith("_"):
-        if isinstance(getattr(sf, element), str):
-            print('Property Name: {0} ;Value: {1}'.format(element, getattr(sf, element)))
+# # get Salesforce org information (for personal confirmation that we've securely connected)
+# for element in dir(sf):
+#     if not element.startswith("_"):
+#         if isinstance(getattr(sf, element), str):
+#             print('Property Name: {0} ;Value: {1}'.format(element, getattr(sf, element)))
 
-# get Salesforce metadata (for personal confirmation that we've securely connected)
-metadata_org = sf.describe()
-print(metadata_org['maxBatchSize'])  # max number of records
-df_sobjects = pd.DataFrame(metadata_org['sobjects'])  # create data frame for sobjects
-df_sobjects.to_csv('org metadata info.csv', index=False)  # convert to csv file to make viewable
+# # get Salesforce metadata (for personal confirmation that we've securely connected)
+# metadata_org = sf.describe()
+# print(metadata_org['maxBatchSize'])  # max number of records
+# df_sobjects = pd.DataFrame(metadata_org['sobjects'])  # create data frame for sobjects
+# df_sobjects.to_csv('org metadata info.csv', index=False)  # convert to csv file to make viewable
 
 # # get fields for a specific object: provide API NAME (goto object manager)
 # project = SFType('__name__', session_id, instance)  # creating project instance
