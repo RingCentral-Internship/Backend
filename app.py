@@ -2,9 +2,11 @@ import json
 import pandas as pd  # show data in a dataframe (original form: list)
 from simple_salesforce import Salesforce, SalesforceLogin, SFType
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 # configure Flask application
 app = Flask(__name__)
+CORS(app)  # enable CORS for all routes
 
 # configure login information
 loginInfo = json.load(open('virtual_env/login.json'))
