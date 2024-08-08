@@ -6,7 +6,7 @@ headers = {
     "Content-Type": "application/json"
 }
 data = {
-    "lead_id": "00Q2H00002GOYd1UAH"
+    "lead_id": "insert here"
 }
 
 response = requests.post(url, headers=headers, data=json.dumps(data))
