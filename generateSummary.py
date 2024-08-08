@@ -86,7 +86,8 @@ def ask_openai(openai_client, system_prompt, user_prompt):
     # debugging
     except Exception as openai_error:
         return f"Unexpected error: {openai_error}"
-    
+
+
 def query_and_summarize_lead(leadID):
     """queries Salesforce and creates an AI summary:
     1. product interest (inferred)
@@ -106,39 +107,53 @@ def query_and_summarize_lead(leadID):
             system_prompt = (
                 "You are an AI assistant that helps sales teams understand their leads. "
                 "Using the provided lead data, provide the following information in clearly marked sections:\n"
-                "1. Product Interest: Explain which RingCentral product the lead might be interested in based on the provided data.\n"
-                "2. Where and Why: Explain where and why the lead is a lead using the fields: LeadSource, Description, Lead_Score__c, Campaign_Member_Target_Segment__c, "
-                "Campaign_Member_Type__c, Campaign_Product__c, MostRecentCampaign__c, Most_Recent_Campaign_Associated_Date__c, "
-                "Most_Recent_Campaign_Description__c, Most_Recent_Campaign_Member_Status__c, Most_Recent_Campaign__c, Primary_Campaign__c, Sales_Campaign__c, "
-                "Most_Recent_Campaign__r.IsActive, Most_Recent_Campaign__r.StartDate, Most_Recent_Campaign__r.Status, Most_Recent_Campaign__r.EndDate.\n"
-                "3. Historical Relationship: Provide a 1-2 sentence summary of the historical relationship with the lead using the fields: Description and (SELECT Field, CreatedDate, NewValue, OldValue FROM Histories).\n"
-                "4. Sales Enablement Hook: Create a creative sales enablement hook that a sales rep can use to convert the lead into a customer."
+                "- Product Interest: Write a 1-2 sentences explaining which RingCentral product the lead might be "
+                "interested in based on the "
+                "provided data and a brief explanation why.\n "
+                "- Where and Why: Write 2-3 sentences about where and why the lead is a lead using the fields: "
+                "LeadSource, "
+                "Description, Lead_Score__c, Campaign_Member_Target_Segment__c, "
+                "Campaign_Member_Type__c, Campaign_Product__c, MostRecentCampaign__c, "
+                "Most_Recent_Campaign_Associated_Date__c, "
+                "Most_Recent_Campaign_Description__c, Most_Recent_Campaign_Member_Status__c, Most_Recent_Campaign__c, "
+                "Primary_Campaign__c, Sales_Campaign__c, "
+                "Most_Recent_Campaign__r.IsActive, Most_Recent_Campaign__r.StartDate, Most_Recent_Campaign__r.Status, "
+                "Most_Recent_Campaign__r.EndDate.\n "
+                "- Historical Relationship: Write a 1-2 sentence summary of the historical relationship with the "
+                "lead using the fields: Description and (SELECT Field, CreatedDate, NewValue, OldValue FROM "
+                "Histories).\n "
+                "- Sales Enablement Hook: Create a creative and curated sales enablement hook that a sales rep can "
+                "use to convert the lead into a customer. \n"
             )
 
             # Generate summary using OpenAI
             summary = ask_openai(client, system_prompt, user_prompt)
+            print(summary)
             return parse_summary(summary)
         else:
             return {"error": "No records found"}
     else:
         return {"error:" "No records found"}
-    
+
+
 def parse_summary(summary):
     """Parses the summary text into a dictionary with specific sections"""
     sections = ["Product Interest", "Where and Why", "Historical Relationship", "Sales Enablement Hook"]
-    summary_dict = {}
+    summary_dict = {section: "" for section in sections}
+    summary_lines = summary.split("\n")  # split by line
+
     current_section = None
 
-    for line in summary.split("\n"):
+    for line in summary_lines:
         line = line.strip()
-        if any(line.startswith(section) for section in sections):
-            current_section = line
-            summary_dict[current_section] = []
+        # Check if the line contains any section header
+        if any(section in line for section in sections):
+            current_section = next(section for section in sections if section in line)
         elif current_section:
-            summary_dict[current_section].append(line)
-    
-    # Join lists into strings
-    for section in summary_dict:
-        summary_dict[section] = " ".join(summary_dict[section])
+            # Add line to the current section in the dictionary
+            if summary_dict[current_section]:
+                summary_dict[current_section] += " " + line
+            else:
+                summary_dict[current_section] = line
 
     return summary_dict
