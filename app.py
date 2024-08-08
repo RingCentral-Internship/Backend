@@ -44,7 +44,7 @@ def query_lead():
     """query lead using lead ID"""
     leadID = request.json.get('lead_id')  # lead ID from js message request
     if leadID:  # lead ID has been received
-        fields = "Id, Name, Company, Email, Phone, Status"
+        fields = "Id, Name, Company, Email, Phone, Status, Title"
         obj = "Lead"
         condition = f"Id = '{leadID}'"
         querySOQL = f"SELECT {fields} FROM {obj} WHERE {condition}"
