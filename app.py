@@ -28,21 +28,22 @@ sf = Salesforce(instance=instance, session_id=session_id)
 # # get Salesforce metadata (for personal confirmation that we've securely connected)
 # metadata_org = sf.describe()
 # print(metadata_org['maxBatchSize'])  # max number of records
-# df_sobjects = pd.DataFrame(metadata_org['sobjects'])  # create data frame for sobjects
-# df_sobjects.to_csv('org metadata info.csv', index=False)  # convert to csv file to make viewable
+# df_objects = pd.DataFrame(metadata_org['sobjects'])  # create data frame for objects
+# df_objects.to_csv('org metadata info.csv', index=False)  # convert to csv file to make viewable
 
-# # get fields for a specific object: provide API NAME (goto object manager)
-# project = SFType('__name__', session_id, instance)  # creating project instance
+# get fields for a specific object: provide API NAME (goto object manager)
+# project = SFType('Lead', session_id, instance)  # creating project instance
 # project_metadata = project.describe()  # accessing data
 # df_project_metadata = pd.DataFrame(project_metadata.get('fields'))  # getting fields
+# df_project_metadata.to_csv('lead fields.csv', index=False)  # convert to csv file to make viewable
 
 
 # query SOQL
 @app.route('/query_lead', methods=['POST'])
 def query_lead():
     """query lead using lead ID"""
-    leadID = request.json.get('lead_id')  # lead ID from js message request 
-    if leadID:  # lead ID has been recieved 
+    leadID = request.json.get('lead_id')  # lead ID from js message request
+    if leadID:  # lead ID has been received
         fields = "Id, Name, Company, Email, Phone, Status"
         obj = "Lead"
         condition = f"Id = '{leadID}'"
