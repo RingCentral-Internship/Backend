@@ -69,7 +69,7 @@ def ask_openai(openai_client, system_prompt, user_prompt):
     """calls openai"""
     try:
         completion = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4",
             temperature=0,
             messages=[
                 {
