@@ -107,7 +107,8 @@ def query_and_summarize_lead(leadID):
             system_prompt = (
                 "You are an AI assistant that helps sales teams understand their leads. "
                 "Using the provided lead data, provide the following information in clearly marked sections:\n"
-                "- Product Interest: Write a 1-2 sentences explaining which RingCentral product the lead might be "
+                "- Product Interest: Do some research on the lead's company (recent news, what the company does, "
+                "etc.) and write a 1-2 sentences explaining which RingCentral product the lead might be "
                 "interested in based on the "
                 "provided data and a brief explanation why.\n "
                 "- Where and Why: Write 2-3 sentences about where and why the lead is a lead using the fields: "
@@ -122,14 +123,20 @@ def query_and_summarize_lead(leadID):
                 "- Historical Relationship: Write a 1-2 sentence summary of the historical relationship with the "
                 "lead using the fields: Description and (SELECT Field, CreatedDate, NewValue, OldValue FROM "
                 "Histories).\n "
-                "- Sales Enablement Hook: Create a creative and curated sales enablement hook that a sales rep can "
+                "- Sales Enablement Hook: Do some research on the lead's company (recent news, what the company does, "
+                "etc.) and create a creative and curated sales enablement hook that a sales rep can "
                 "use to convert the lead into a customer. \n"
             )
 
             # Generate summary using OpenAI
             summary = ask_openai(client, system_prompt, user_prompt)
-            print(summary)
-            return parse_summary(summary)
+            summary_dict = parse_summary(summary)  # dictionary representation split by section
+
+            # include general information about lead
+            for field in ["Name", "Company", "Title", "Email", "Phone", "Status"]:
+                summary_dict[field] = lead_data.get(field, '')
+
+            return summary_dict
         else:
             return {"error": "No records found"}
     else:
