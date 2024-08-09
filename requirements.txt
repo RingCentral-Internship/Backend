@@ -1,0 +1,5 @@
+Flask==3.0.3
+Flask-Cors==4.0.1
+requests==2.32.3
+simple-salesforce==1.12.6
+openai==1.40.1
