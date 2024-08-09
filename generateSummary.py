@@ -1,19 +1,31 @@
 import json
 import openai
 import requests
+import os
 from simple_salesforce import Salesforce, SalesforceLogin
 from config import OPENAI_API_KEY
 
 
-# configure login information
+# configure login information: LOCAL
 loginInfo = json.load(open('virtual_env/login.json'))
 username = loginInfo['username']
 password = loginInfo['password']
 security_token = loginInfo['security_token']
 domain = 'login'
 
+# # configure login information: VERCEL DEPLOYMENT
+# username = os.getenv('SFDC_USERNAME')
+# password = os.getenv('SFDC_PW')
+# security_token = os.getenv('SFDC_SECURITY_TOKEN')
+# domain = 'login'
+# if not all([username, password, security_token]):
+#     raise ValueError("Salesforce credentials are not fully set. Please check environment variables.")
+
 # connect to Salesforce securely (no risk of username, pw, token exposure)
-session_id, instance = SalesforceLogin(username=username, password=password, security_token=security_token, domain=domain)
+session_id, instance = SalesforceLogin(username=username,
+                                       password=password,
+                                       security_token=security_token,
+                                       domain=domain)
 sf = Salesforce(instance=instance, session_id=session_id)
 
 # Fields to query
@@ -62,6 +74,7 @@ except requests.RequestException as request_error:
 
 # configuring openAI access
 openai.api_key = OPENAI_API_KEY
+# openai.api_key = os.getenv('OPENAI_API_KEY')
 client = openai.OpenAI()  # creating an OpenAI client instance
 
 
@@ -95,7 +108,7 @@ def query_and_summarize_lead(leadID):
     3. history of interactions (using data)
     4. sales enablement hook (creatively curated for lead according to information)
     """
-    if leadID:  # check if ID has been recieved 
+    if leadID:  # check if ID has been received
         obj = "Lead"
         condition = f"Id = '{leadID}'"
         querySOQL = f"SELECT {fields} FROM {obj} WHERE {condition}"
