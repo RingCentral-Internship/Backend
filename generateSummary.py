@@ -101,79 +101,105 @@ def ask_openai(openai_client, system_prompt, user_prompt):
         return f"Unexpected error: {openai_error}"
 
 
-def query_and_summarize_lead(leadID):
-    """queries Salesforce and creates an AI summary:
-    1. product interest (inferred)
-    2. where and why they are a lead (using data)
-    3. history of interactions (using data)
-    4. sales enablement hook (creatively curated for lead according to information)
-    """
+def query_product_list():
+    """queries a list of all the RC products in SFDC"""
+    querySOQL = "SELECT Intended_Product__c FROM Campaign GROUP BY Intended_Product__c"
+    result = sf.query(querySOQL)  # query products list (will not return repeated product names)
+    if result['records']:
+        product_list = [record['Intended_Product__c'] for record in result['records']]  # generating list of products
+        return ', '.join(product_list)
+    else:
+        return "no products found"
+
+
+def query_lead_data(leadID):
+    """queries Salesforce lead data"""
     if leadID:  # check if ID has been received
         obj = "Lead"
         condition = f"Id = '{leadID}'"
         querySOQL = f"SELECT {fields} FROM {obj} WHERE {condition}"
         result = sf.query(querySOQL)  # query data
-
         if result['records']:
-            lead_data = result['records'][0]  # isolating lead data 
-            user_prompt = json.dumps(lead_data)
-            system_prompt = (
-                "You are an AI assistant that helps sales teams understand their leads. "
-                "Using the provided lead data, provide the following information in clearly marked sections:\n"
-                "- Product Interest: Do some research on the lead's company (recent news, what the company does, "
-                "etc.) and write a 1-2 sentences explaining which RingCentral product the lead might be "
-                "interested in based on the "
-                "provided data and a brief explanation why.\n "
-                "- Where and Why: Write 2-3 sentences about where and why the lead is a lead using the fields: "
-                "LeadSource, "
-                "Description, Lead_Score__c, Campaign_Member_Target_Segment__c, "
-                "Campaign_Member_Type__c, Campaign_Product__c, MostRecentCampaign__c, "
-                "Most_Recent_Campaign_Associated_Date__c, "
-                "Most_Recent_Campaign_Description__c, Most_Recent_Campaign_Member_Status__c, Most_Recent_Campaign__c, "
-                "Primary_Campaign__c, Sales_Campaign__c, "
-                "Most_Recent_Campaign__r.IsActive, Most_Recent_Campaign__r.StartDate, Most_Recent_Campaign__r.Status, "
-                "Most_Recent_Campaign__r.EndDate.\n "
-                "- Historical Relationship: Write a 1-2 sentence summary of the historical relationship with the "
-                "lead using the fields: Description and (SELECT Field, CreatedDate, NewValue, OldValue FROM "
-                "Histories).\n "
-                "- Sales Enablement Hook: Do some research on the lead's company (recent news, what the company does, "
-                "etc.) and create a creative and curated sales enablement hook that a sales rep can "
-                "use to convert the lead into a customer. \n"
-            )
-
-            # Generate summary using OpenAI
-            summary = ask_openai(client, system_prompt, user_prompt)
-            summary_dict = parse_summary(summary)  # dictionary representation split by section
-
-            # include general information about lead
-            for field in ["Name", "Company", "Title", "Email", "Phone", "Status"]:
-                summary_dict[field] = lead_data.get(field, '')
-
-            return summary_dict
+            return result['records'][0]  # return lead data
         else:
-            return {"error": "No records found"}
+            return {"error": "no records found"}
     else:
-        return {"error:" "No records found"}
+        return {"error": "no records found"}
 
 
-def parse_summary(summary):
-    """Parses the summary text into a dictionary with specific sections"""
+def summarize_section(section_title, lead_data, products=None):
+    """generates an AI driven summary for a given section:
+    1. product interest (use AI to infer)
+    2. where and why they are a lead (use data)
+    3. history of interactions (use data)
+    4. sales enablement hook (creatively curated for lead)"""
+    # background knowledge/ context for pre-processing
+    documentation = (
+        "You are an AI assistant that helps sales teams understand and engage with their leads effectively. "
+        "Using the provided lead data, you will analyze and generate insights. Use the following documentation and "
+        "sales process flows to ensure that your responses are insightful, relevant,and tailored to the sales funnel stages. "
+        "1. Lead Flow and Sales Funnel "
+        "- lead statuses: "
+        "   - X. Suspect: the initial stage where leads are part of the total addressable market. "
+        "   - X. Open: Early interest is shown, but the lead has not been qualified. "
+        "   - 1. New: Leads are ready for initial sales contact through email or phone. "
+    )
+    section_prompts = {
+        "Product Interest": (
+            f"Here is a list of all the products that RingCentral has to offer: {products}. "
+            "Do external research on the lead's company background, including recent news, "
+            "industry, and business model, and suggest which RingCentral product(s) the lead might "
+            "be most interested in. Create a bulleted list of the/ these product(s) with a brief "
+            "explanation that connects the company's needs with the features of the suggested product(s). "
+            "Use the lead's industry context and past product interest data from similar companies where it "
+            "is applicable/ available."
+        ),
+        "Where and Why": (
+            "Assess the lead's journey in the sales funnel. Highlight your findings in a bulleted list, "
+            "deep diving into where this lead is in the sales funnel and why they are at this stage. "
+            "Reference the appropriate lead statuses (e.g. X. Suspect, 1. New, 2. Contacted) and the influence "
+            "of recent campaigns/ interactions. "
+        ),
+        "Historical Relationship": (
+            "Provide a bulleted list of the lead's historical relationship with RingCentral. This "
+            "should include changes in lead status, past interactions, and any key activities noted. "
+            "Highlight patterns or significant events that have influence the lead's current status. "
+        ),
+        "Sales Enablement Hook": (
+            "Develop a compelling sales enablement hook based on the lead's company profile, recent activities, "
+            "and historical interactions with RingCentral. This hook should be creative, leverage recent industry trends "
+            "or company news, and directly address potential pain points or needs identified in the lead's history. "
+            "Ensure that the hook aligns with the specific sales stage and aims to move the lead further down the funnel. "
+        ),
+    }
+
+    system_prompt = documentation + section_prompts.get(section_title, "Invalid section title")  # select correct system prompt
+    user_prompt = json.dumps(lead_data)  # lead data
+
+    return ask_openai(client, system_prompt, user_prompt)
+
+
+def query_and_summarize_lead(leadID):
+    """completes summary response for lead data"""
+    lead_data = query_lead_data(leadID)  # get lead data for user prompt
+    if "error" in lead_data:  # query failed
+        return lead_data
+
+    products = query_product_list()  # get list of product for product interest section
+
+    # define sections for summary and storage container for AI responses
     sections = ["Product Interest", "Where and Why", "Historical Relationship", "Sales Enablement Hook"]
-    summary_dict = {section: "" for section in sections}
-    summary_lines = summary.split("\n")  # split by line
+    summary_dict = {}
 
-    current_section = None
+    for section in sections:  # traverse each section and create summary for each
+        if section == "Product Interest":  # pass in products list
+            summary = summarize_section(section, lead_data, products=products)
+        else:
+            summary = summarize_section(section, lead_data)  # create summary for current section
+        summary_dict[section] = summary  # store in summary dictionary
 
-    for line in summary_lines:
-        line = line.strip()
-        # Check if the line contains any section header
-        if any(section in line for section in sections):
-            current_section = next(section for section in sections if section in line)
-        elif current_section:
-            # Add line to the current section in the dictionary
-            if summary_dict[current_section]:
-                summary_dict[current_section] += " " + line
-            else:
-                summary_dict[current_section] = line
+    # include general information about lead
+    for field in ["Name", "Company", "Title", "Email", "Phone", "Status"]:
+        summary_dict[field] = lead_data.get(field, '')
 
     return summary_dict
