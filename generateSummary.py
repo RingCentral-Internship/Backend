@@ -30,31 +30,25 @@ sf = Salesforce(instance=instance, session_id=session_id)
 
 # Fields to query
 fields_list = [
-    'Id', 
-    'Name', 
-    'Company', 
-    'Title', 
-    'Email', 
-    'Phone', 
-    'Status', 
-    'LeadSource', 
-    'Description', 
-    'Lead_Score__c', 
-    'Campaign_Member_Target_Segment__c', 
-    'Campaign_Member_Type__c', 
-    'Campaign_Product__c', 
-    'MostRecentCampaign__c', 
-    'Most_Recent_Campaign_Associated_Date__c', 
-    'Most_Recent_Campaign_Description__c', 
-    'Most_Recent_Campaign_Member_Status__c', 
-    'Most_Recent_Campaign__c', 
-    'Primary_Campaign__c', 
-    'Sales_Campaign__c', 
-    '(SELECT Field, CreatedDate, NewValue, OldValue FROM Histories)', 
-    'Most_Recent_Campaign__r.IsActive', 
-    'Most_Recent_Campaign__r.StartDate', 
-    'Most_Recent_Campaign__r.Status', 
-    'Most_Recent_Campaign__r.EndDate'
+    "Name",
+    "Title",
+    "Company",
+    "Email",
+    "Phone",
+    "SDR_Agents__c",
+    "Address",
+    "NumberOfEmployees__c",
+    "Segment_Master_c.Name",
+    "Status",
+    "LeadSource",
+    "Description",
+    "Lead_Entry_Source__c",
+    "Most_Recent_Campaign_Associated_Date__c",
+    "Most_Recent_Campaign_Description__c",
+    "Most_Recent_Campaign__c",
+    "(SELECT Field, CreatedDate, NewValue FROM Histories WHERE FIELD IN('Status', 'BMID__c', 'Most_Recent_Campaign__c', 'Downgrade_Reason__c') ORDER BY CreatedDate DESC)",
+    "Most_Recent_Campaign__r.Description",
+    "Notes__c"
 ]
 
 # Join fields into a single string
@@ -135,41 +129,53 @@ def summarize_section(section_title, lead_data, products=None):
     4. sales enablement hook (creatively curated for lead)"""
     # background knowledge/ context for pre-processing
     documentation = (
-        "You are an AI assistant that helps sales teams understand and engage with their leads effectively. "
-        "Using the provided lead data, you will analyze and generate insights. Use the following documentation and "
-        "sales process flows to ensure that your responses are insightful, relevant,and tailored to the sales funnel stages. "
-        "1. Lead Flow and Sales Funnel "
-        "- lead statuses: "
+        "You are an AI assistant that helps the RingCentral sales teams understand and engage with their leads effectively. "
+        "Using the provided lead data, you will analyze and generate insights. Use the following field value documentation "
+        "to ensure that your responses are insightful, relevant,and tailored to the sales funnel stages. "
+        "- Status: "
         "   - X. Suspect: the initial stage where leads are part of the total addressable market. "
         "   - X. Open: Early interest is shown, but the lead has not been qualified. "
         "   - 1. New: Leads are ready for initial sales contact through email or phone. "
+        "   - 1.5. Call out: Leads are actively engaged by the sales team. "
+        "   - 2. Contacted: Leads have been contacted and are being nurtured. "
+        "   - 0. Downgraded: Leads that are not currently viable but may be revisited. "
+        "   - .5. Re-New: Downgraded leads that have been re-engaged. "
+        "- leadSource: how a lead enters the RingCentral system."
+        "- Description: additional description describing the lead."
+        "- Lead_Entry_Source__c: specific source of entry where elad entered the RingCentral system. "
+        "- Campaign_Product__c: product being advertised for campaign. "
+        "- Most_Recent_Campaign_Associated_Date__c: date lead entered campaign. "
+        "- Most_Recent_Campaign_Description__c: brief description of campaign. "
+        "- Most_Recent_Campaign_c: campaign last advertised to lead. "
+        "- Campaign History: list of the most recent campaigns along with the products advertised in those campaigns. "
+        "- Most_Recent_Campaign_r.Description: full description of most recent campaign. "
+        "- Notes__c: additional information on lead. "
     )
     section_prompts = {
         "Product Interest": (
             f"Here is a list of all the products that RingCentral has to offer: {products}. "
-            "Do external research on the lead's company background, including recent news, "
+            "1. Do research on each RingCentral product and identify their individual value propositions and functions. "
+            "2. Do external research on the lead's company background, including recent news, "
             "industry, and business model, and suggest which RingCentral product(s) the lead might "
-            "be most interested in. Create a bulleted list of the/ these product(s) with a brief "
-            "explanation that connects the company's needs with the features of the suggested product(s). "
-            "Use the lead's industry context and past product interest data from similar companies where it "
-            "is applicable/ available."
+            "be most interested in. "
+            "3. Create a bulleted list of 1-2 products the lead may be interested in and provide a brief "
+            "explanation that connects the lead company's needs with the features of the suggested product(s). "
+            "Use the lead's industry context, company size, company location, and past product interest data "
+            "from similar companies where it is applicable/ available."
         ),
         "Where and Why": (
-            "Assess the lead's journey in the sales funnel. Highlight your findings in a bulleted list, "
-            "deep diving into where this lead is in the sales funnel and why they are at this stage. "
-            "Reference the appropriate lead statuses (e.g. X. Suspect, 1. New, 2. Contacted) and the influence "
-            "of recent campaigns/ interactions. "
+            "Assess the lead's journey. Deep diving into where this lead came from, why they entered the RingCentral system, and their current"
+            "relationship with RingCentral. Reference the appropriate lead statuses (e.g. X. Suspect, 1. New, 2. Contacted) "
+            "and the influence of recent campaigns/ interactions. Summarize these points in three bullets: where, why, and current. "
         ),
         "Historical Relationship": (
             "Provide a bulleted list of the lead's historical relationship with RingCentral. This "
-            "should include changes in lead status, past interactions, and any key activities noted. "
-            "Highlight patterns or significant events that have influence the lead's current status. "
+            "should include changes in lead status, past interactions, and their most recently engaged campaigns. "
         ),
         "Sales Enablement Hook": (
             "Develop a compelling sales enablement hook based on the lead's company profile, recent activities, "
             "and historical interactions with RingCentral. This hook should be creative, leverage recent industry trends "
-            "or company news, and directly address potential pain points or needs identified in the lead's history. "
-            "Ensure that the hook aligns with the specific sales stage and aims to move the lead further down the funnel. "
+            "or company news, and directly address potential pain points or needs identified by the lead. "
         ),
     }
 
@@ -199,7 +205,8 @@ def query_and_summarize_lead(leadID):
         summary_dict[section] = summary  # store in summary dictionary
 
     # include general information about lead
-    for field in ["Name", "Company", "Title", "Email", "Phone", "Status"]:
+    for field in ["Name", "Company", "Title", "Email", "Phone", "Status","Address"]:
         summary_dict[field] = lead_data.get(field, '')
 
     return summary_dict
+
