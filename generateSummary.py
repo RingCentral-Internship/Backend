@@ -165,9 +165,10 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
 
     # background knowledge/ context for pre-processing
     documentation = (
-        "You are an AI assistant that helps the RingCentral sales teams understand and "
+        "You are an AI assistant that helps the RingCentral sales reps understand and "
         "engage with their leads effectively. Using the provided lead data, you will analyze and "
-        "generate insights. Use the following field value documentation "
+        "generate insights. Your goal is to help RingCentral sales reps sell and convert leads into opportunities. "
+        "Use the following field value documentation "
         "to ensure that your responses are insightful, relevant,and tailored to the sales funnel stages. "
         "- Status: "
         "   - X. Suspect: the initial stage where leads are part of the total addressable market. "
@@ -184,23 +185,32 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
         "- Most_Recent_Campaign_Associated_Date__c: date lead entered campaign. "
         "- Most_Recent_Campaign_Description__c: brief description of campaign. "
         "- Most_Recent_Campaign_c: campaign last advertised to lead. "
-        "- Campaign History: list of the most recent campaigns along with the products advertised in those campaigns. "
+        "- Campaign History: 5 most recent campaigns along with the products advertised in those campaigns. "
         "- Most_Recent_Campaign_r.Description: full description of most recent campaign. "
         "- Notes__c: additional information on lead. "
+        "Make sure that the information is concise, direct/ to the point, and relevant to what a sales rep "
+        "may want to know when talking/ engaging with a lead. The information/ insights you provide "
+        "should be quick and easy to read (may not need to be in full sentences, sales reps"
+        "should be able to glance at information and understand what to address with lead immediately). "
+        "Sales reps need to be able to look at the generated insights/ inferences "
+        "and make quick decisions for how they will engage/ sell the RingCentral business. "
     )
 
     # define system prompts based on section for requests
     section_prompts = {
         "Product Interest": (
             f"Here is a list of all the products that RingCentral has to offer: {products}. "
-            "1. Do research on each RingCentral product and identify their "
+            "Do research on each RingCentral product and identify their "
             "individual value propositions and functions. "
-            "2. Do external research on the lead's company background, including recent news, "
+            "Do external research on the lead's company background, including recent news, "
             "industry, and business model, and suggest which RingCentral product(s) the lead might "
             "be most interested in. "
-            "3. Use the leadSource, Lead_Entry_Source, most recent campaign information, and campaign product to "
-            "create a bulleted list of 1-2 products the lead may be interested in. Provide a brief "
-            "explanation that connects the lead company's needs with the features of the suggested product(s). "
+            "Using all the collected information and the lead data: "
+            "leadSource, Lead_Entry_Source, most recent campaign information, and campaign product, "
+            "come up with 1-2 bullet point(s) each assigned to a RingCentral product "
+            f"(choose from the following: {products}) the lead may be interested in. "
+            "For each bullet, provide reasoning a sales rep could use to advertise and cater the product towards "
+            "the lead. Connects the lead company's needs with the features of the suggested product(s). "
             "Additionally use the lead's industry context, company size, company location, and "
             "past product interest data from similar companies where it is applicable/ available."
         ),
@@ -212,13 +222,17 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
             "Summarize these points in three bullets: where, why, and current. "
         ),
         "Historical Relationship": (
-            "Provide a bulleted list of the lead's historical relationship with RingCentral. Identify a pattern"
-            ", a consistent interest in a certain part of the RingCentral business/ product or "
-            "anything that stands out. "
+            "Provide a bulleted rundown (no more than 2-4 bullets) of the lead's historical relationship with "
+            "RingCentral. Identify a pattern, a consistent interest in a certain part of the RingCentral business/ "
+            "product or anything that stands out with the campaign history provided "
+            "(use specific campaign names and products). "
+            "Provided will be 5 (if applicable) most recent campaigns the lead engaged with. "
         ),
         "Sales Enablement Hook": (
             "Develop a compelling sales enablement hook. This hook should be creative, leverage recent industry "
             "trends or company news, and directly address potential pain points or needs identified by the lead. "
+            "The hook should be in the form of a bulleted list (no more than 3 bullets) that highlight "
+            "talking points the sales rep could use. "
         ),
     }
 
