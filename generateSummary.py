@@ -1,7 +1,5 @@
 import json
 import openai
-import requests
-import os
 from simple_salesforce import Salesforce, SalesforceLogin
 from config import OPENAI_API_KEY
 
@@ -28,43 +26,6 @@ session_id, instance = SalesforceLogin(username=username,
                                        domain=domain)
 sf = Salesforce(instance=instance, session_id=session_id)
 
-# Fields to query
-fields_list = [
-    "Name",
-    "Title",
-    "Company",
-    "Email",
-    "Phone",
-    "SDR_Agents__c",
-    "Address",
-    "NumberOfEmployees__c",
-    "Segment_Master_c.Name",
-    "Status",
-    "LeadSource",
-    "Description",
-    "Lead_Entry_Source__c",
-    "Most_Recent_Campaign_Associated_Date__c",
-    "Most_Recent_Campaign_Description__c",
-    "Most_Recent_Campaign__c",
-    "(SELECT Field, CreatedDate, NewValue FROM Histories WHERE FIELD IN('Status', 'BMID__c', 'Most_Recent_Campaign__c', 'Downgrade_Reason__c') ORDER BY CreatedDate DESC)",
-    "Most_Recent_Campaign__r.Description",
-    "Notes__c"
-]
-
-# Join fields into a single string
-fields = ", ".join(fields_list)
-
-# debugging connection errors
-print(f"OpenAI library version: {openai.__version__}")
-print(f"API Key (first 5 chars): {OPENAI_API_KEY[:5]}...")
-try:
-    response = requests.get("https://api.openai.com/v1/engines",
-                            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"})
-    print(f"OpenAI API response status: {response.status_code}")
-    print(f"OpenAI API response: {response.text[:100]}...")  # Print first 100 chars
-except requests.RequestException as request_error:
-    print(f"Error reaching OpenAI API: {request_error}")
-
 
 # configuring openAI access
 openai.api_key = OPENAI_API_KEY
@@ -76,7 +37,7 @@ def ask_openai(openai_client, system_prompt, user_prompt):
     """calls openai"""
     try:
         completion = openai_client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             temperature=0,
             messages=[
                 {
@@ -100,15 +61,56 @@ def query_product_list():
     querySOQL = "SELECT Intended_Product__c FROM Campaign GROUP BY Intended_Product__c"
     result = sf.query(querySOQL)  # query products list (will not return repeated product names)
     if result['records']:
-        product_list = [record['Intended_Product__c'] for record in result['records']]  # generating list of products
-        return ', '.join(product_list)
+        product_list = [record['Intended_Product__c'] for record in result['records'] if record['Intended_Product__c']]
+        return ', '.join(product_list) if product_list else "no products found"
     else:
         return "no products found"
+
+
+def query_campaign_history(leadID):
+    """queries the 5 most recent campaigns lead engaged with"""
+    if leadID:  # check if ID has been received
+        # set up
+        fields = "Campaign.Intended_Product__c, Campaign.CreatedDate, Campaign.Name"
+        obj = "CampaignMember"
+        condition = f"LeadId = '{leadID}'"
+        querySOQL = f"SELECT {fields} FROM {obj} WHERE {condition} ORDER BY CreatedDate DESC LIMIT 5"
+        result = sf.query(querySOQL)  # query products list (will not return repeated product names)
+        if result['records']:
+            return result['records']  # return campaign history
+        else:
+            return {"error": "no campaign history found"}
+    else:
+        return {"error": "no campaign history found"}
 
 
 def query_lead_data(leadID):
     """queries Salesforce lead data"""
     if leadID:  # check if ID has been received
+        # set up
+        fields_list = [
+            "Name",
+            "Title",
+            "Company",
+            "Email",
+            "Phone",
+            "SDR_Agents__c",
+            "NumberOfEmployees__c",
+            "SegmentName__r.Name",
+            "Status",
+            "LeadSource",
+            "Description",
+            "Lead_Entry_Source__c",
+            "Most_Recent_Campaign_Associated_Date__c",
+            "Most_Recent_Campaign_Description__c",
+            "Most_Recent_Campaign__c",
+            "Most_Recent_Campaign__r.Name",
+            "Most_Recent_Campaign__r.Intended_Product__c",
+            "Most_Recent_Campaign__r.Description",
+            "Notes__c"
+        ]
+        # Join fields into a single string
+        fields = ", ".join(fields_list)
         obj = "Lead"
         condition = f"Id = '{leadID}'"
         querySOQL = f"SELECT {fields} FROM {obj} WHERE {condition}"
@@ -121,16 +123,51 @@ def query_lead_data(leadID):
         return {"error": "no records found"}
 
 
-def summarize_section(section_title, lead_data, products=None):
+def format_user_prompt(lead_data=None, campaign_history=None):
+    """Formats lead data or campaign history into a compact string for the user prompt."""
+    if lead_data:  # formatting string for lead_data json
+        return (
+            f"Title: {lead_data.get('Title', 'N/A')}, "
+            f"Company: {lead_data.get('Company', 'N/A')}, "
+            f"Number of Employees: {lead_data.get('NumberOfEmployees__c', 'N/A')}, "
+            f"Status: {lead_data.get('Status', 'N/A')}, "
+            f"Segment: {lead_data.get('Segment_Master_c.Name', 'N/A')}, "
+            f"Lead Source: {lead_data.get('LeadSource', 'N/A')}, "
+            f"Description: {lead_data.get('Description', 'N/A')}, "
+            f"Lead Entry Source: {lead_data.get('Lead_Entry_Source__c', 'N/A')}, "
+            f"Recent Campaign Date: {lead_data.get('Most_Recent_Campaign_Associated_Date__c', 'N/A')}, "
+            f"Recent Campaign Description: {lead_data.get('Most_Recent_Campaign_Description__c', 'N/A')}, "
+            f"Recent Campaign: {lead_data.get('Most_Recent_Campaign__c', 'N/A')}, "
+            f"Recent Campaign Name: {lead_data.get('Most_Recent_Campaign__r.Name', 'N/A')}, "
+            f"Recent Campaign Product: {lead_data.get('Most_Recent_Campaign__r.Intended_Product__c', 'N/A')}, "
+            f"Notes: {lead_data.get('Notes__c', 'N/A')}"
+        )
+    elif campaign_history:  # formatting string for campaign_history json
+        history_entries = []
+        for entry in campaign_history:
+            campaign = entry.get('Campaign', {})
+            history_entries.append(
+                f"Campaign Name: {campaign.get('Name', 'N/A')}, "
+                f"Product: {campaign.get('Intended_Product__c', 'N/A')}, "
+                f"Date: {campaign.get('CreatedDate', 'N/A')}"
+            )
+        return " | ".join(history_entries)
+
+    return "No data available"
+
+
+def summarize_section(section_title, lead_data, products, campaign_history, previous_responses):
     """generates an AI driven summary for a given section:
     1. product interest (use AI to infer)
     2. where and why they are a lead (use data)
     3. history of interactions (use data)
     4. sales enablement hook (creatively curated for lead)"""
+
     # background knowledge/ context for pre-processing
     documentation = (
-        "You are an AI assistant that helps the RingCentral sales teams understand and engage with their leads effectively. "
-        "Using the provided lead data, you will analyze and generate insights. Use the following field value documentation "
+        "You are an AI assistant that helps the RingCentral sales teams understand and "
+        "engage with their leads effectively. Using the provided lead data, you will analyze and "
+        "generate insights. Use the following field value documentation "
         "to ensure that your responses are insightful, relevant,and tailored to the sales funnel stages. "
         "- Status: "
         "   - X. Suspect: the initial stage where leads are part of the total addressable market. "
@@ -142,7 +179,7 @@ def summarize_section(section_title, lead_data, products=None):
         "   - .5. Re-New: Downgraded leads that have been re-engaged. "
         "- leadSource: how a lead enters the RingCentral system."
         "- Description: additional description describing the lead."
-        "- Lead_Entry_Source__c: specific source of entry where elad entered the RingCentral system. "
+        "- Lead_Entry_Source__c: specific source of entry where lead entered the RingCentral system. "
         "- Campaign_Product__c: product being advertised for campaign. "
         "- Most_Recent_Campaign_Associated_Date__c: date lead entered campaign. "
         "- Most_Recent_Campaign_Description__c: brief description of campaign. "
@@ -151,62 +188,80 @@ def summarize_section(section_title, lead_data, products=None):
         "- Most_Recent_Campaign_r.Description: full description of most recent campaign. "
         "- Notes__c: additional information on lead. "
     )
+
+    # define system prompts based on section for requests
     section_prompts = {
         "Product Interest": (
             f"Here is a list of all the products that RingCentral has to offer: {products}. "
-            "1. Do research on each RingCentral product and identify their individual value propositions and functions. "
+            "1. Do research on each RingCentral product and identify their "
+            "individual value propositions and functions. "
             "2. Do external research on the lead's company background, including recent news, "
             "industry, and business model, and suggest which RingCentral product(s) the lead might "
             "be most interested in. "
-            "3. Create a bulleted list of 1-2 products the lead may be interested in and provide a brief "
+            "3. Use the leadSource, Lead_Entry_Source, most recent campaign information, and campaign product to "
+            "create a bulleted list of 1-2 products the lead may be interested in. Provide a brief "
             "explanation that connects the lead company's needs with the features of the suggested product(s). "
-            "Use the lead's industry context, company size, company location, and past product interest data "
-            "from similar companies where it is applicable/ available."
+            "Additionally use the lead's industry context, company size, company location, and "
+            "past product interest data from similar companies where it is applicable/ available."
         ),
         "Where and Why": (
-            "Assess the lead's journey. Deep diving into where this lead came from, why they entered the RingCentral system, and their current"
-            "relationship with RingCentral. Reference the appropriate lead statuses (e.g. X. Suspect, 1. New, 2. Contacted) "
-            "and the influence of recent campaigns/ interactions. Summarize these points in three bullets: where, why, and current. "
+            "Assess the lead's journey by looking at their Status and most recent campaign information. "
+            "Deep diving into where this lead came from, "
+            "why they entered the RingCentral system, and their current relationship with RingCentral. "
+            "Use the Description and Notes__c if relevant. "
+            "Summarize these points in three bullets: where, why, and current. "
         ),
         "Historical Relationship": (
-            "Provide a bulleted list of the lead's historical relationship with RingCentral. This "
-            "should include changes in lead status, past interactions, and their most recently engaged campaigns. "
+            "Provide a bulleted list of the lead's historical relationship with RingCentral. Identify a pattern"
+            ", a consistent interest in a certain part of the RingCentral business/ product or "
+            "anything that stands out. "
         ),
         "Sales Enablement Hook": (
-            "Develop a compelling sales enablement hook based on the lead's company profile, recent activities, "
-            "and historical interactions with RingCentral. This hook should be creative, leverage recent industry trends "
-            "or company news, and directly address potential pain points or needs identified by the lead. "
+            "Develop a compelling sales enablement hook. This hook should be creative, leverage recent industry "
+            "trends or company news, and directly address potential pain points or needs identified by the lead. "
         ),
     }
 
-    system_prompt = documentation + section_prompts.get(section_title, "Invalid section title")  # select correct system prompt
-    user_prompt = json.dumps(lead_data)  # lead data
+    # select system prompt for request
+    system_prompt = documentation + section_prompts.get(section_title, "Invalid section title")
+
+    # format data as string for user prompt
+    if section_title == "Product Interest" or section_title == "Where and Why":
+        user_prompt = format_user_prompt(lead_data=lead_data)
+    elif section_title == "Historical Relationship":
+        user_prompt = format_user_prompt(campaign_history=campaign_history)
+    elif section_title == "Sales Enablement Hook":
+        user_prompt = "\n".join(previous_responses.values())
+    else:
+        user_prompt = "No relevant data available."
 
     return ask_openai(client, system_prompt, user_prompt)
 
 
 def query_and_summarize_lead(leadID):
     """completes summary response for lead data"""
+    products = query_product_list()  # get list of product for product interest section
+    campaign_history = query_campaign_history(leadID)  # get lead campaign history
+
+    if "error" in campaign_history:  # query failed
+        return campaign_history
+
     lead_data = query_lead_data(leadID)  # get lead data for user prompt
     if "error" in lead_data:  # query failed
         return lead_data
 
-    products = query_product_list()  # get list of product for product interest section
-
     # define sections for summary and storage container for AI responses
     sections = ["Product Interest", "Where and Why", "Historical Relationship", "Sales Enablement Hook"]
     summary_dict = {}
+    previous_responses = {"Company": f"{lead_data.get('Company', '')}"}
 
     for section in sections:  # traverse each section and create summary for each
-        if section == "Product Interest":  # pass in products list
-            summary = summarize_section(section, lead_data, products=products)
-        else:
-            summary = summarize_section(section, lead_data)  # create summary for current section
+        summary = summarize_section(section, lead_data, products, campaign_history, previous_responses)
         summary_dict[section] = summary  # store in summary dictionary
+        previous_responses[section] = summary  # store previous responses for sales enablement hook
 
     # include general information about lead
-    for field in ["Name", "Company", "Title", "Email", "Phone", "Status","Address"]:
+    for field in ["Name", "Company", "Title", "Email", "Phone", "Status"]:
         summary_dict[field] = lead_data.get(field, '')
 
     return summary_dict
-
