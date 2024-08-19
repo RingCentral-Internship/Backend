@@ -156,7 +156,7 @@ def format_user_prompt(lead_data=None, campaign_history=None):
     return "No data available"
 
 
-def summarize_section(section_title, lead_data, products, campaign_history, previous_responses):
+def summarize_section(section_title, lead_data, products, campaign_history, previous_responses, user_input=None):
     """generates an AI driven summary for a given section:
     1. product interest (use AI to infer)
     2. where and why they are a lead (use data)
@@ -190,7 +190,7 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
         "- Notes__c: additional information on lead. "
         "Make sure that the information is concise, direct/ to the point, and relevant to what a sales rep "
         "may want to know when talking/ engaging with a lead. The information/ insights you provide "
-        "should be quick and easy to read (may not need to be in full sentences, sales reps"
+        "should be quick and easy to read (does not need to be full complete sentences-- sales reps"
         "should be able to glance at information and understand what to address with lead immediately). "
         "Sales reps need to be able to look at the generated insights/ inferences "
         "and make quick decisions for how they will engage/ sell the RingCentral business. "
@@ -234,6 +234,23 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
             "The hook should be in the form of a bulleted list (no more than 3 bullets) that highlight "
             "talking points the sales rep could use. "
         ),
+        "Ask more": (
+            "Respond to the sales rep's inquiries about the lead. "
+            "If questions about the company arise, conduct external research. "
+            "For questions regarding specific detail about the lead, rely on the provided lead data "
+            "and campaign history to offer insightful responses. However, do not fabricate any information-- "
+            "stick strictly to the data you have. It's acceptable to inform the user if you do not have access to "
+            "certain requested information. "
+            "It's also important to disclose that the information you're working with is limited. "
+            "The details you can share with the user include: "
+            "lead name, company name, lead's title at the company, contact information, "
+            "SDR agents, company size, segment name, lead status, lead source, lead entry source, "
+            "information about the most recent campaign the lead engaged with, and the five most recently "
+            "attended campaigns. "
+            "Any other information is beyond your current knowledge. "
+            f"Here is the lead data and campaign history: "
+            f"{format_user_prompt(lead_data=lead_data)} {format_user_prompt(campaign_history=campaign_history)}"
+        )
     }
 
     # select system prompt for request
@@ -246,6 +263,8 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
         user_prompt = format_user_prompt(campaign_history=campaign_history)
     elif section_title == "Sales Enablement Hook":
         user_prompt = "\n".join(previous_responses.values())
+    elif section_title == "Ask more":
+        user_prompt = user_input
     else:
         user_prompt = "No relevant data available."
 
