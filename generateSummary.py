@@ -56,6 +56,17 @@ def ask_openai(openai_client, system_prompt, user_prompt):
         return f"Unexpected error: {openai_error}"
 
 
+def query_duplicates(leadID, email):
+    """queries all duplicate leads"""
+
+    querySOQL = f"SELECT Id FROM LEAD WHERE Email = '{email}' AND Id != '{leadID}'"
+    result = sf.query(querySOQL)  # query all duplicate lead ids
+    if result['totalSize'] > 0:  # duplicates were found-- add to dictionary
+        return [record['Id'] for record in result['records'] if record['Id'].strip() != leadID]
+    else:  # no duplicates found
+        return "No duplicates found"
+
+
 def query_product_list():
     """queries a list of all the RC products in SFDC"""
     querySOQL = "SELECT Intended_Product__c FROM Campaign GROUP BY Intended_Product__c"
@@ -246,7 +257,8 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
             "be most interested in. "
             "Using all the collected information and the lead data-- "
             "leadSource, Lead_Entry_Source, most recent campaign information, and campaign product-- "
-            "come up with 1-2 RingCentral products the lead may be interested in. "
+            "come up with 1-2 RingCentral products (choose from the ones listed tagged 'Product: <Product name>') "
+            "the lead may be interested in. "
             "In bullet points, provide the following information for each RingCentral product: "
             "- **Product**: <Product name> "
             "- **Recommended Pricing Plan**: <ideal pricing plan (only provide this bullet if applicable)> "
@@ -283,6 +295,9 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
             "talking points the sales rep could use. Remember to get "
             "straight to the point (do not use full sentences, insights provided should just be notes for a sales "
             "rep to use when engaging with the lead). "
+            "Make sure that talking points are applicable to the most recent news on the lead's company "
+            "or pain points. Be specific with the recent updates/ pain points about the company and relate them "
+            "to how RingCentral can provide a solution for them. "
             "NOTE: your response should only include the sales enablement hook. "
             "Do not provide any additional information. "
         ),
@@ -348,5 +363,8 @@ def query_and_summarize_lead(leadID):
     # include general information about lead
     for field in ["Name", "Company", "Title", "Email", "Phone", "Status"]:
         summary_dict[field] = lead_data.get(field, '')
+
+    # add duplicate lead IDs to response
+    summary_dict["Duplicates"] = query_duplicates(leadID, lead_data.get("Email", ""))
 
     return summary_dict
