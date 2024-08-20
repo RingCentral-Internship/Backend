@@ -64,7 +64,7 @@ def query_duplicates(leadID, email):
     if result['totalSize'] > 0:  # duplicates were found-- add to dictionary
         return [record['Id'] for record in result['records'] if record['Id'].strip() != leadID]
     else:  # no duplicates found
-        return "No duplicates found"
+        return []
 
 
 def query_product_list():
