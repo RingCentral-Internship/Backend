@@ -365,6 +365,6 @@ def query_and_summarize_lead(leadID):
         summary_dict[field] = lead_data.get(field, '')
 
     # add duplicate lead IDs to response
-    summary_dict["Duplicates"] = query_duplicates(leadID, lead_data.get("Email", ""))
+    summary_dict["Duplicate Leads"] = query_duplicates(leadID, lead_data.get("Email", ""))
 
     return summary_dict
