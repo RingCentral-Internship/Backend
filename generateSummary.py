@@ -401,7 +401,9 @@ def query_and_summarize_lead(leadID):
     # include general information about lead
     for field in ["Name", "Company", "Title", "Email", "Phone", "Status", "SegmentName__r.Name", "SM_Employees__c"]:
         if field == "SegmentName__r.Name":
-            summary_dict["SegmentName__r.Name"] = lead_data.get('SegmentName__r', {}).get('Name', 'N/A')
+            summary_dict["Segment Name"] = lead_data.get('SegmentName__r', {}).get('Name', 'N/A')
+        elif field == "SM_Employees__c":
+            summary_dict["SM Employees"] = lead_data.get(field, '')
         else:
             summary_dict[field] = lead_data.get(field, '')
 
