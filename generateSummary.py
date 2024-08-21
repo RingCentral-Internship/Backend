@@ -72,7 +72,6 @@ def query_duplicates(leadID, email):
         AND Status IN ({', '.join([f"'{status}'" for status in lead_statuses])})
     """
     lead_result = sf.query(queryLead)
-    print(lead_result)
     lead_duplicates = [record['Id'] for record in lead_result['records']]
 
     # query duplicate opportunities
@@ -87,7 +86,6 @@ def query_duplicates(leadID, email):
         AND StageName IN ({', '.join([f"'{stage}'" for stage in opportunity_stages])})
     """
     opportunity_result = sf.query(queryOpportunity)
-    print(opportunity_result)
     if not opportunity_result['records']:
         opportunity_duplicates = []
     else:
@@ -409,7 +407,6 @@ def query_and_summarize_lead(leadID):
 
     # add duplicate lead IDs to response
     duplicates = query_duplicates(leadID, lead_data.get("Email", ""))
-    print(duplicates)
     summary_dict["Duplicate Leads"] = duplicates.get('Duplicate Leads')
     summary_dict["Duplicate Opportunities"] = duplicates.get('Duplicate Opportunities')
 
