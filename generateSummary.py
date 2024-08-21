@@ -57,14 +57,46 @@ def ask_openai(openai_client, system_prompt, user_prompt):
 
 
 def query_duplicates(leadID, email):
-    """queries all duplicate leads"""
+    """queries all duplicate leads and opportunities with open status"""
 
-    querySOQL = f"SELECT Id FROM LEAD WHERE Email = '{email}' AND Id != '{leadID}'"
-    result = sf.query(querySOQL)  # query all duplicate lead ids
-    if result['totalSize'] > 0:  # duplicates were found-- add to dictionary
-        return [record['Id'] for record in result['records'] if record['Id'].strip() != leadID]
-    else:  # no duplicates found
-        return []
+    # define open statuses
+    lead_statuses = ['.5. Re-New', '1. New', '1.5. Call out', '2. Contacted']
+    opportunity_stages = ['1. Qualify', '2. Problem', '3. Solution', '4. Proof', '5. Agreement', '6. Order']
+
+    # query duplicate leads
+    queryLead = f"""
+        SELECT Id
+        FROM Lead
+        WHERE Email = '{email}'
+        AND Id != '{leadID}'
+        AND Status IN ({', '.join([f"'{status}'" for status in lead_statuses])})
+    """
+    lead_result = sf.query(queryLead)
+    print(lead_result)
+    lead_duplicates = [record['Id'] for record in lead_result['records']]
+
+    # query duplicate opportunities
+    queryOpportunity = f"""
+        SELECT Id
+        FROM Opportunity
+        WHERE Id IN (
+            SELECT OpportunityId
+            FROM OpportunityContactRole
+            WHERE Contact.Email = '{email}'
+        )
+        AND StageName IN ({', '.join([f"'{stage}'" for stage in opportunity_stages])})
+    """
+    opportunity_result = sf.query(queryOpportunity)
+    print(opportunity_result)
+    if not opportunity_result['records']:
+        opportunity_duplicates = []
+    else:
+        opportunity_duplicates = [opp['Id'] for opp in opportunity_result['records']]
+
+    return {
+        'Duplicate Leads': lead_duplicates,
+        'Duplicate Opportunities': opportunity_duplicates
+    }
 
 
 def query_product_list():
@@ -341,8 +373,6 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
     else:
         user_prompt = "No relevant data available."
 
-    print(user_prompt)
-
     return ask_openai(client, system_prompt, user_prompt)
 
 
@@ -368,8 +398,6 @@ def query_and_summarize_lead(leadID):
         summary_dict[section] = summary  # store in summary dictionary
         previous_responses[section] = summary  # store previous responses for sales enablement hook
 
-    print(lead_data)
-
     # include general information about lead
     for field in ["Name", "Company", "Title", "Email", "Phone", "Status", "SegmentName__r.Name", "SM_Employees__c"]:
         if field == "SegmentName__r.Name":
@@ -378,6 +406,9 @@ def query_and_summarize_lead(leadID):
             summary_dict[field] = lead_data.get(field, '')
 
     # add duplicate lead IDs to response
-    summary_dict["Duplicate Leads"] = query_duplicates(leadID, lead_data.get("Email", ""))
+    duplicates = query_duplicates(leadID, lead_data.get("Email", ""))
+    print(duplicates)
+    summary_dict["Duplicate Leads"] = duplicates.get('Duplicate Leads')
+    summary_dict["Duplicate Opportunities"] = duplicates.get('Duplicate Opportunities')
 
     return summary_dict
