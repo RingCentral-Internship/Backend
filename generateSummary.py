@@ -108,6 +108,7 @@ def query_lead_data(leadID):
             "SDR_Agents__c",
             "NumberOfEmployees__c",
             "SegmentName__r.Name",
+            "SM_Employees__c",
             "Status",
             "LeadSource",
             "Description",
@@ -142,15 +143,18 @@ def format_user_prompt(lead_data=None, campaign_history=None):
             f"Company: {lead_data.get('Company', 'N/A')}, "
             f"Number of Employees: {lead_data.get('NumberOfEmployees__c', 'N/A')}, "
             f"Status: {lead_data.get('Status', 'N/A')}, "
-            f"Segment: {lead_data.get('Segment_Master_c.Name', 'N/A')}, "
             f"Lead Source: {lead_data.get('LeadSource', 'N/A')}, "
             f"Description: {lead_data.get('Description', 'N/A')}, "
             f"Lead Entry Source: {lead_data.get('Lead_Entry_Source__c', 'N/A')}, "
             f"Recent Campaign Date: {lead_data.get('Most_Recent_Campaign_Associated_Date__c', 'N/A')}, "
             f"Recent Campaign Description: {lead_data.get('Most_Recent_Campaign_Description__c', 'N/A')}, "
             f"Recent Campaign: {lead_data.get('Most_Recent_Campaign__c', 'N/A')}, "
-            f"Recent Campaign Name: {lead_data.get('Most_Recent_Campaign__r.Name', 'N/A')}, "
-            f"Recent Campaign Product: {lead_data.get('Most_Recent_Campaign__r.Intended_Product__c', 'N/A')}, "
+            f"Recent Campaign Name: "
+            f"{lead_data.get('Most_Recent_Campaign__r', {}).get('Name', 'N/A')}, "
+            "Recent Campaign Product: "
+            f"{lead_data.get('Most_Recent_Campaign__r', {}).get('Intended_Product__c', 'N/A')}, "
+            "Recent Campaign Detailed Description: "
+            f"{lead_data.get('Most_Recent_Campaign__r', {}).get('Description', 'N/A')}, "
             f"Notes: {lead_data.get('Notes__c', 'N/A')}"
         )
     elif campaign_history:  # formatting string for campaign_history json
@@ -181,6 +185,8 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
         "generate insights. Your goal is to help RingCentral sales reps sell and convert leads into opportunities. "
         "Use the following field value documentation "
         "to ensure that your responses are insightful, relevant,and tailored to the sales funnel stages. "
+        "- Title: Lead's job position for its company "
+        "- Company: Business or organization the lead is representing. The business we want to sell our product to "
         "- Status: "
         "   - X. Suspect: the initial stage where leads are part of the total addressable market. "
         "   - X. Open: Early interest is shown, but the lead has not been qualified. "
@@ -189,16 +195,16 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
         "   - 2. Contacted: Leads have been contacted and are being nurtured. "
         "   - 0. Downgraded: Leads that are not currently viable but may be revisited. "
         "   - .5. Re-New: Downgraded leads that have been re-engaged. "
-        "- leadSource: how a lead enters the RingCentral system."
+        "- Lead Source: how a lead enters the RingCentral system."
         "- Description: additional description describing the lead."
-        "- Lead_Entry_Source__c: specific source of entry where lead entered the RingCentral system. "
-        "- Campaign_Product__c: product being advertised for campaign. "
-        "- Most_Recent_Campaign_Associated_Date__c: date lead entered campaign. "
-        "- Most_Recent_Campaign_Description__c: brief description of campaign. "
-        "- Most_Recent_Campaign_c: campaign last advertised to lead. "
+        "- Lead Entry Source: specific source of entry where lead entered the RingCentral system. "
+        "- Recent Campaign Product: product being advertised for campaign. "
+        "- Recent Campaign Date: date lead entered campaign. "
+        "- Recent_Campaign Description: brief description of campaign. "
+        "- Recent Campaign Name: campaign last advertised to lead. "
         "- Campaign History: 5 most recent campaigns along with the products advertised in those campaigns. "
-        "- Most_Recent_Campaign_r.Description: full description of most recent campaign. "
-        "- Notes__c: additional information on lead. "
+        "- Most Recent Campaign detailed Description: full description of most recent campaign. "
+        "- Notes: additional information on lead. "
         "Generate concise bullet points summarizing key details. "
         "Each point should be one sentence or less, focusing only on essential information for "
         "quick reference by a sales rep. "
@@ -311,7 +317,7 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
             "It's also important to disclose that the information you're working with is limited. "
             "The details you can share with the user include: "
             "lead name, company name, lead's title at the company, contact information, "
-            "SDR agents, company size, segment name, lead status, lead source, lead entry source, "
+            "SDR agents, company size, lead status, lead source, lead entry source, "
             "information about the most recent campaign the lead engaged with, and the five most recently "
             "attended campaigns. "
             "Any other information is beyond your current knowledge. "
@@ -334,6 +340,8 @@ def summarize_section(section_title, lead_data, products, campaign_history, prev
         user_prompt = user_input
     else:
         user_prompt = "No relevant data available."
+
+    print(user_prompt)
 
     return ask_openai(client, system_prompt, user_prompt)
 
@@ -360,9 +368,14 @@ def query_and_summarize_lead(leadID):
         summary_dict[section] = summary  # store in summary dictionary
         previous_responses[section] = summary  # store previous responses for sales enablement hook
 
+    print(lead_data)
+
     # include general information about lead
-    for field in ["Name", "Company", "Title", "Email", "Phone", "Status"]:
-        summary_dict[field] = lead_data.get(field, '')
+    for field in ["Name", "Company", "Title", "Email", "Phone", "Status", "SegmentName__r.Name", "SM_Employees__c"]:
+        if field == "SegmentName__r.Name":
+            summary_dict["SegmentName__r.Name"] = lead_data.get('SegmentName__r', {}).get('Name', 'N/A')
+        else:
+            summary_dict[field] = lead_data.get(field, '')
 
     # add duplicate lead IDs to response
     summary_dict["Duplicate Leads"] = query_duplicates(leadID, lead_data.get("Email", ""))
