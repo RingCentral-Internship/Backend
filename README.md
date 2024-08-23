@@ -17,11 +17,35 @@ API endpoint to make:
    - historical relationship (relevant engagement/ patterns with RC)
    - sales enablement hook (talking points to sell RC product)
  
-**Configuration**
+**Configuration/ Run Instructions**
 - local build:
    - config.py: Provide OpenAI API key
    - create a virtual environment and install necessary dependencies
    - virtual_env/login.json: Provide SFDC login credentials (username, password, and security token)
-- vercel deployment:
+- vercel deployment (not yet deployed):
    - use os environment variables for API key and SFDC credentials
-   - vercel.json-- get all pip dependencies 
+   - vercel.json-- get all pip dependencies
+- to run:
+  - activate virtual environment
+  - export OpenAI API key
+  - run python3 app.py (will run on local 5000 server)
+- testing without frontend:
+  - can run testing.py by replacing JSON POST request info (endpoint must be running locally)
+  - can run on postman (JSON POST request structure is provided in testing.py) 
+
+**Tech Stack**
+- Programming Language: Python
+- Web Framework: Flask (what allows program to be an API endpoint)
+   - handles communication between frontend and backend (request handling and response sending)
+- Libraries: 
+   - Integration: SFDC (simple-salesforce library)
+      - query lead data from SFDC
+   - AI driven lead summaries: OpenAI API (model: GPT-3.5-turbo)
+- Data Handling: JSON (responses and SFDC queries are returned in a JSON structured format)
+
+**File Description**
+- app.py: API endpoint configuration and routing
+- config.py: OpenAI API Key setup
+- generateSummary.py: SFDC integration configuration, OpenAI API configuration, OpenAI request functions, query function (duplicate leads/ opportunities, SFDC RC products, SFDC lead campaign history, SDFDC lead data)
+- testing.py: test program locally (replace "lead_id" as needed)
+- virtual_env/login.json: SFDC login credentials for local build
