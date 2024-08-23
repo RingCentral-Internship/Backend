@@ -11,10 +11,10 @@ API endpoint to make:
 
 **Lead Summary Battle Card**
 - sections:
-   - lead general info (name, company, email, phone, status, company title)
+   - lead general info (name, company, email, phone, status, company title, segment, SM employees)
    - product interest (RC product would show must interest in)
    - where and why (where the lead entered RC system and why they are a lead)
-   - historical relationship (relevant engagement/ patterns with RC)
+   - historical relationship (relevant engagement/ patterns with RC and duplicate leads/ opportunities)
    - sales enablement hook (talking points to sell RC product)
  
 **Configuration/ Run Instructions**
